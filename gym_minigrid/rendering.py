@@ -10,7 +10,7 @@ class Window(QMainWindow):
     Simple application window to render the environment into
     """
 
-    def __init__(self):
+    def __init__(self, display_mission=True):
         super().__init__()
 
         self.setWindowTitle('MiniGrid Gym Environment')
@@ -20,9 +20,11 @@ class Window(QMainWindow):
         self.imgLabel.setFrameStyle(QFrame.Panel | QFrame.Sunken)
 
         # Text box for the mission
-        self.missionBox = QTextEdit()
-        self.missionBox.setReadOnly(True)
-        self.missionBox.setMinimumSize(400, 100)
+        self.display_mission = display_mission
+        if display_mission:
+            self.missionBox = QTextEdit()
+            self.missionBox.setReadOnly(True)
+            self.missionBox.setMinimumSize(400, 100)
 
         # Center the image
         hbox = QHBoxLayout()
@@ -33,7 +35,8 @@ class Window(QMainWindow):
         # Arrange widgets vertically
         vbox = QVBoxLayout()
         vbox.addLayout(hbox)
-        vbox.addWidget(self.missionBox)
+        if display_mission:
+            vbox.addWidget(self.missionBox)
 
         # Create a main widget for the window
         mainWidget = QWidget(self)
@@ -56,7 +59,8 @@ class Window(QMainWindow):
         self.imgLabel.setPixmap(pixmap)
 
     def setText(self, text):
-        self.missionBox.setPlainText(text)
+        if self.display_mission:
+            self.missionBox.setPlainText(text)
 
     def setKeyDownCb(self, callback):
         self.keyDownCb = callback
@@ -95,8 +99,15 @@ class Window(QMainWindow):
             return
         self.keyDownCb(keyName)
 
+    def display_image(self, rgb_array):
+        height, width, channel = rgb_array.shape
+        bytes_per_line = channel * width
+        qt_img = QImage(rgb_array.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        self.setPixmap(QPixmap.fromImage(qt_img))
+
+
 class Renderer:
-    def __init__(self, width, height, ownWindow=False):
+    def __init__(self, width, height, ownWindow=False, display_mission=True):
         self.width = width
         self.height = height
 
@@ -106,7 +117,7 @@ class Renderer:
         self.window = None
         if ownWindow:
             self.app = QApplication([])
-            self.window = Window()
+            self.window = Window(display_mission)
 
     def close(self):
         """
@@ -138,17 +149,13 @@ class Renderer:
     def getArray(self):
         """
         Get a numpy array of RGB pixel values.
-        The size argument should be (3,w,h)
+        The array will have shape (height, width, 3)
         """
-
-        width = self.width
-        height = self.height
-        shape = (width, height, 3)
 
         numBytes = self.width * self.height * 3
         buf = self.img.bits().asstring(numBytes)
         output = np.frombuffer(buf, dtype='uint8')
-        output = output.reshape(shape)
+        output = output.reshape((self.height, self.width, 3))
 
         return output
 
